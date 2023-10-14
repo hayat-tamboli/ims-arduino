@@ -1,6 +1,6 @@
 #include "set.h"
 #include <Adafruit_NeoPixel.h>
-#ifdef __AVR__
+#ifdef _AVR_
   #include <avr/power.h>
 #endif
 
@@ -31,7 +31,7 @@ int sectionNo = -1;
 
 void setup()
 {
-  #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+  #if defined(_AVR_ATtiny85_) && (F_CPU == 16000000)
   	clock_prescale_set(clock_div_1);
   #endif
 
@@ -48,23 +48,23 @@ void loop()
 {
   livingStrip();
   readMux();
-  // switch(sectionNo) {
-  //   case 0:
-  //     sectionDead(0,12);
-  //     break;
-  //   case 1:
-  //     sectionDead(12,24);
-  //     break;
-  //   case 2:
-  //     sectionDead(24,36);
-  //     break;
-  //   case 3:
-  //     sectionDead(36,48);
-  //     break;
-  //   case 4:
-  //     sectionDead(48,60);
-  //     break;
-  // }
+  switch(sectionNo) {
+    case 0:
+      sectionDead(0,12);
+      break;
+    case 1:
+      sectionDead(12,24);
+      break;
+    case 2:
+      sectionDead(24,36);
+      break;
+    case 3:
+      sectionDead(36,48);
+      break;
+    case 4:
+      sectionDead(48,60);
+      break;
+  }
 }
 
 void livingStrip()
@@ -136,6 +136,7 @@ void readMux()
 
     if(sensorValue<200)
     {
+      sectionNo = channel;
       if(last_channel == channel)
       {
         break;
@@ -147,5 +148,5 @@ void readMux()
     }
     delay(100);
   }
-  delay(100);
+  delay(100);
 }
