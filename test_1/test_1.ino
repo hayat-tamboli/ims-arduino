@@ -4,29 +4,43 @@
   #include <avr/power.h>
 #endif
 
+// #include <CD74HC4067.h>
+
+#include <Arduino.h>
+#include "Mux.h"
+
+using namespace admux;
+/*
+ * Creates a Mux instance.
+ *
+ * 1st argument is the SIG (signal) pin (Arduino digital input pin 6).
+ * 2nd argument is the S0-S3 (channel control) pins (Arduino pins 2, 3, 4, 5).
+ */
+Mux mux(Pin(6, INPUT, PinType::Digital), Pinset(2, 3, 4, 5));
+
+
+
 #define LEDPIN 13
-#define NUMPIXELS 60
+#define NUMPIXELS 120
 Adafruit_NeoPixel pixels(NUMPIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
-#define DELAYVAL 10
+#define DELAYVAL 15
 
 bool flow = 1;
 
-const int s0Pin = 2;
-const int s1Pin = 3;
-const int s2Pin = 4;
-const int s3Pin = 5;
-const int signalPin = A0;  // The analog input pin connected to the SIG pin of 74HC4067
+int total_sensors = 6;
 
-int last_channel = -1;
-int total_sensors = 2;
-
-uint32_t aliveColor = pixels.Color(0,0,255);
-uint32_t deadColor = pixels.Color(255,0,0);
-uint32_t noColor = pixels.Color(0,0,0);
+const uint32_t aliveColor = pixels.Color(180,255,0);
+const uint32_t deadColor = pixels.Color(0,0,0);
+const uint32_t noColor = pixels.Color(0,0,0);
 
 Set ledDead;
 
-int sectionNo = -1;
+int sectionNo = -1; // don't change
+const int leds_in_section = NUMPIXELS/total_sensors;
+
+int resetTime = 20000;
+long int t1;
+long int t2;
 
 
 void setup()
@@ -35,48 +49,53 @@ void setup()
   	clock_prescale_set(clock_div_1);
   #endif
 
+  t1 = millis();
+
   pixels.begin();
   pixels.clear();
-  pinMode(s0Pin, OUTPUT);
-  pinMode(s1Pin, OUTPUT);
-  pinMode(s2Pin, OUTPUT);
-  pinMode(s3Pin, OUTPUT);
-  Serial.begin(9600);
+  // Serial port initialization.
+  Serial.begin(9600); while (!Serial) /* Waits for serial port to connect (needed for Leonardo only) */;
 }
+
+void(* resetFunc) (void) = 0;
 
 void loop()
 {
-  livingStrip();
-  readMux();
-  switch(sectionNo) {
-    case 0:
-      sectionDead(0,12);
-      break;
-    case 1:
-      sectionDead(12,24);
-      break;
-    case 2:
-      sectionDead(24,36);
-      break;
-    case 3:
-      sectionDead(36,48);
-      break;
-    case 4:
-      sectionDead(48,60);
-      break;
+  // to reset the machine after some time
+  long int t2 = millis();
+  if((t2-t1) >= resetTime)
+  {
+    Serial.println("reset");
+    delay(30);
+    resetFunc();
   }
+  // flowing strip
+  // livingStrip();
+  constBlue();
+  // // reading the channels from mux
+  readMux();
 }
 
 void livingStrip()
 {
-  if(flow == 1)
-  {
+  if(flow == 1){
     addFlow();
   }
-  else
-  {
+  else{
     removeFlow();
   }
+  // sectionDead(0);
+  // delay(1000);
+  // sectionDead(1);
+  // delay(2000);
+  // sectionDead(2);
+  // delay(2000);
+  // sectionDead(3);
+  // delay(2000);
+  // sectionDead(4);
+  // delay(2000);
+  // sectionDead(5);
+  // delay(2000);
 }
 void addFlow()
 {
@@ -85,6 +104,7 @@ void addFlow()
     {
       continue;
     }
+    // Serial.println(i);
     pixels.setPixelColor(i, aliveColor);
     pixels.show();
     delay(DELAYVAL);
@@ -92,6 +112,18 @@ void addFlow()
     {
       flow = 0;
     }
+  }
+}
+void constBlue()
+{
+  sectionDead(5);
+  for(int i=0; i<NUMPIXELS; i++) {
+    if(ledDead.has(i))
+    {
+      continue;
+    }
+    pixels.setPixelColor(i, aliveColor);
+    pixels.show();
   }
 }
 void removeFlow()
@@ -102,51 +134,52 @@ void removeFlow()
     {
       continue;
     }
+    // Serial.println(i);
     pixels.setPixelColor(i, noColor);
     pixels.show();
     delay(DELAYVAL);
     if(i==(NUMPIXELS-1))
     {
-      flow = 1;
+      flow = 1; 
     }
   }
 }
-void sectionDead(int start, int end) {
-  for(int i = start; i<end ; i++)
+void sectionDead(int section) {
+  Serial.println("deleting " + String(section+1) + " Section");
+  int start = section*leds_in_section;
+  for(int i = start; i<(start + leds_in_section) ; i++)
     {
+      if(i>=NUMPIXELS)
+      {
+        break; 
+      }
       ledDead.add(i);
       pixels.setPixelColor(i, deadColor);
       pixels.show();
+      delay(10);
     }
 }
 
 void readMux()
 {
-  for (int channel = 0; channel < total_sensors; channel++) {
-    // Set the multiplexer channel
-      Serial.print("IR Sensor ");
-    digitalWrite(s0Pin, bitRead(channel, 0));
-    digitalWrite(s1Pin, bitRead(channel, 1));
-    digitalWrite(s2Pin, bitRead(channel, 2));
-    digitalWrite(s3Pin, bitRead(channel, 3));
-
-    // Read the sensor value
-    int sensorValue = analogRead(signalPin);
-      Serial.println(sensorValue);
-
-    if(sensorValue<200)
+  byte data;
+  // mux.channelCount()
+  for (byte i = 0; i < total_sensors; i++) {
+    data = mux.read(i) /* Reads from channel i (returns HIGH or LOW) */;
+    if(data == HIGH)
     {
-      sectionNo = channel;
-      if(last_channel == channel)
+      continue;
+    }
+    else
+    {
+      if(i==(total_sensors-1))
       {
         break;
       }
-      last_channel = channel;
-      Serial.print("IR Sensor ");
-      Serial.print(channel);
-      Serial.println(" is bieng touched ");
+    Serial.print("Push button at channel "); Serial.print(i); Serial.print(" is "); Serial.println("pressed");
+    sectionDead(i);
     }
-    delay(100);
   }
-  delay(100);
+
+  delay(5);
 }

@@ -1,7 +1,8 @@
-const int s0Pin = 3;
-const int s1Pin = 4;
-const int s2Pin = 5;
-const int s3Pin = 6;
+const int s0Pin = 2;
+const int s1Pin = 3;
+const int s2Pin = 4;
+const int s3Pin = 5
+;
 const int signalPin = A0;  // The analog input pin connected to the SIG pin of 74HC4067
 
 int last_channel = -1;
@@ -18,6 +19,7 @@ void setup() {
 void loop() {
   for (int channel = 0; channel < total_sensors; channel++) {
     // Set the multiplexer channel
+      Serial.print("IR Sensor ");
     digitalWrite(s0Pin, bitRead(channel, 0));
     digitalWrite(s1Pin, bitRead(channel, 1));
     digitalWrite(s2Pin, bitRead(channel, 2));
@@ -25,6 +27,7 @@ void loop() {
 
     // Read the sensor value
     int sensorValue = analogRead(signalPin);
+      Serial.println(sensorValue);
 
     if(sensorValue<200)
     {
@@ -34,10 +37,10 @@ void loop() {
       }
       last_channel = channel;
       Serial.print("IR Sensor ");
-      Serial.print(++channel);
+      Serial.print(channel);
       Serial.println(" is bieng touched ");
     }
-    
-    delay(100); // Delay for better readability
+    delay(100);
   }
+  delay(100);
 }
