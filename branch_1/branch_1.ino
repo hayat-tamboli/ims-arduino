@@ -20,61 +20,65 @@ Mux mux1(Pin(6, INPUT, PinType::Digital), Pinset(2, 3, 4, 5));
 Mux mux2(Pin(12, INPUT, PinType::Digital), Pinset(8, 9, 10, 11));
 
 
-
 #define LEDPIN 13
-#define NUMPIXELS 120
+#define NUMPIXELS 396
 Adafruit_NeoPixel pixels(NUMPIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
-#define DELAYVAL 15
+#define DELAYVAL 1
 
 bool flow = 1;
 
-int total_sensors_1 = 12;
-int total_sensors_2 = 6;
+int total_sensors_1 = 14;
+int total_sensors_2 = 14;
 
 const uint32_t aliveColor = pixels.Color(0, 0, 255);
 const uint32_t deadColor = pixels.Color(0, 0, 0);
 const uint32_t noColor = pixels.Color(0, 0, 0);
 
 Set ledDead;
+Set dead_section_set;
+
+int leds_sectional_flow_count = 100;
 
 int sectionNo = -1;  // don't change
-const int leds_in_section = NUMPIXELS / total_sensors_1 + total_sensors_2;
+const int total_sections = (total_sensors_1 + total_sensors_2); // 14+14 = 28
+const int leds_in_section = 17; 
+const int reset_section_number = 10;
+int dead_section_count = 0;
 
-int resetTime = 20000;
-long int t1;
-long int t2;
 
+// variables to reset stuff
+// int resetTime = 20000;
+// long int t1;
+// long int t2;
 
 void setup() {
 #if defined(_AVR_ATtiny85_) && (F_CPU == 16000000)
   clock_prescale_set(clock_div_1);
 #endif
 
-  t1 = millis();
+  // t1 = millis();
 
   pixels.begin();
   pixels.clear();
   // Serial port initialization.
   Serial.begin(9600);
-  while (!Serial) /* Waits for serial port to connect (needed for Leonardo only) */
-    ;
-  // sectionDead(5);
+  // while (!Serial);
 }
 
 void (*resetFunc)(void) = 0;
 
 void loop() {
   // to reset the machine after some time
-  long int t2 = millis();
-  if ((t2 - t1) >= resetTime) {
-    Serial.println("reset");
-    delay(30);
-    resetFunc();
-  }
-  // flowing strip
+  // long int t2 = millis();
+  // if ((t2 - t1) >= resetTime) {
+  //   Serial.println("reset");
+  //   delay(30);
+  //   resetFunc();
+  // }
+  // if(total_sections)
+  constColor();
   // livingStrip();
-  constBlue();
-  // // reading the channels from mux
+  // reading the channels from mux 1 and 2
   readMux1();
   readMux2();
 }
@@ -87,35 +91,38 @@ void livingStrip() {
   }
 }
 void addFlow() {
-  for (int i = 0; i < NUMPIXELS; i++) {
+  // for (int i = 0; i < NUMPIXELS; i++) {
+  for (int i = (NUMPIXELS-1); i >=0; i--) {
     if (ledDead.has(i)) {
       continue;
     }
     pixels.setPixelColor(i, aliveColor);
     pixels.show();
-    delay(DELAYVAL);
+    // delay(DELAYVAL);
     if (i == (NUMPIXELS - 1)) {
       flow = 0;
     }
   }
 }
-void constBlue() {
-  for (int i = 0; i < NUMPIXELS; i++) {
+void constColor() {
+  // for (int i = 0; i < NUMPIXELS; i++) {
+    for (int i = (NUMPIXELS-1); i >=0; i--) {
     if (ledDead.has(i)) {
       continue;
     }
     pixels.setPixelColor(i, aliveColor);
-    pixels.show();
   }
+  pixels.show();
 }
+
 void removeFlow() {
-  for (int i = 0; i < NUMPIXELS; i++) {
+  // for (int i = 0; i < NUMPIXELS; i++) {
+    for (int i = (NUMPIXELS-1); i >=0; i--) {
     if (ledDead.has(i)) {
       continue;
     }
     pixels.setPixelColor(i, noColor);
     pixels.show();
-    delay(DELAYVAL);
     if (i == (NUMPIXELS - 1)) {
       flow = 1;
     }
@@ -123,50 +130,44 @@ void removeFlow() {
 }
 void sectionDead(int section) {
   Serial.println("deleting " + String(section + 1) + " Section");
-  int start = section * leds_in_section;
+  int start = (section) * leds_in_section;
+  Serial.println(String(start));
+  Serial.println(String(start+leds_in_section));
+  // delay(2000);
   for (int i = start; i < (start + leds_in_section); i++) {
     if (i >= NUMPIXELS) {
       break;
     }
     ledDead.add(i);
     pixels.setPixelColor(i, deadColor);
-    pixels.show();
   }
+    pixels.show();
 }
 
 void readMux1() {
   byte data;
-  Serial.println("Total channel count " + String(mux1.channelCount()));
-  Serial.println("using channel count " + String(total_sensors_1));
   for (int8_t i = 0; i < (total_sensors_1); i++) {
     data = mux1.read(i); /* Reads from channel i (returns HIGH or LOW) */
-    Serial.println(String((i + 1)) + String(data));
-    // delay(200);
+    Serial.println("a" + String(i) + " " + String(data));
     if (data == HIGH) {
       continue;
     } else {
-      Serial.println("channel " + String(i) + " in mux 1");
+      // Serial.println("channel " + String(i) + " in mux 1");
       sectionDead(i);
     }
   }
-  Serial.println("----------");
-  delay(400);
+  // Serial.println("----------");
 }
 void readMux2() {
   byte data;
-  Serial.println("Total channel count " + String(mux2.channelCount()));
-  Serial.println("using channel count " + String(total_sensors_2));
   for (int8_t i = 0; i < (total_sensors_2); i++) {
     data = mux2.read(i) /* Reads from channel i (returns HIGH or LOW) */;
-    Serial.println(String((i + 13)) + String(data));
-    // delay(200);
+    Serial.println("b" + String(i) + " " + String(data));
     if (data == HIGH) {
       continue;
     } else {
-      Serial.print("channel " + String(i + 12) +  " in mux 1");
-      sectionDead((i+12));
+      sectionDead((i+14));
     }
   }
   Serial.println("----------");
-  delay(400);
 }
